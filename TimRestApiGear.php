@@ -19,9 +19,9 @@
 		printf("\nusage:\n");
 		printf("  php TimRestApiGear.php (server_name) (command) args...\neg:\n");
 		printf("  php TimRestApiGear.php openim sendmsg (account_id) (receiver) (text_content)\n   单发消息\n");
-		printf("  php TimRestApiGear.php openim sendmsg_pic (account_id) (receiver) (pic_path)\n   单发图片\n");
+		printf("  php TimRestApiGear.php openim sendmsg_pic (account_id) (receiver) (pic_path)\n   单发图片(图片不超过10M)\n");
 		printf("  php TimRestApiGear.php openim batchsendmsg (account_id1,account_id2,...) (text_content)\n   批量发消息(接收者id组以逗号分隔)\n\n");
-		printf("  php TimRestApiGear.php openim batchsendmsg_pic (account_id1,account_id2,...) (pic_path)\n   批量发图片(接收者id组以逗号分隔)\n\n");
+		printf("  php TimRestApiGear.php openim batchsendmsg_pic (account_id1,account_id2,...) (pic_path)\n   批量发图片(接收者id组以逗号分隔,图片不超过10M)\n\n");
 		printf("  php TimRestApiGear.php profile portrait_get (account_id)\n   获取用户资料\n");
 		printf("  php TimRestApiGear.php profile portrait_set (account_id) (new_name)\n   修改用户名称\n\n");
 		printf("  php TimRestApiGear.php sns friend_import (account_id) (receiver)\n   建立好友关系\n");
@@ -44,7 +44,7 @@
 		printf("  php TimRestApiGear.php group_open_http_svc get_role_in_group (group_id) (member_id)\n   获取用户在群组中身份\n");
 		printf("  php TimRestApiGear.php group_open_http_svc forbid_send_msg (group_id) (member_id) (second)\n   在群组中禁言用户\n");
 		printf("  php TimRestApiGear.php group_open_http_svc send_group_msg (account_id) (group_id) (text_content)\n   群组中发送普通消息\n");
-		printf("  php TimRestApiGear.php group_open_http_svc send_group_msg_pic (account_id) (group_id) (pic_path)\n   群组中发送图片\n");
+		printf("  php TimRestApiGear.php group_open_http_svc send_group_msg_pic (account_id) (group_id) (pic_path)\n   群组中发送图片(图片不超过10M)\n");
 		printf("  php TimRestApiGear.php group_open_http_svc send_group_system_notification (group_id) (text_content) (receive_id)\n   群组中发送系统消息\n");
 		return;
 	}

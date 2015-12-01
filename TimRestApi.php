@@ -1,6 +1,5 @@
 <?php
 require_once dirname(__FILE__) . '/TimRestInterface.php';
-
 class TimRestAPI extends TimRestInterface
 {
 	#app基本信息
@@ -17,6 +16,7 @@ class TimRestAPI extends TimRestInterface
 	protected $version = 'v4';
 	protected $contenttype = 'json';
 	protected $apn = '0';
+
 	
 	/**
 	 * 初始化函数
@@ -34,7 +34,7 @@ class TimRestAPI extends TimRestInterface
 	}
 
 	/** 
-	 * 根据Identifier生成UserSig的方法
+	 * 构造访问REST服务器的参数
 	 * @param string $server_name 服务名
 	 * @param string $cmd_name 命令名
 	 * @param string $identifier 用户名
@@ -55,8 +55,8 @@ class TimRestAPI extends TimRestInterface
 			. "&contenttype=" . $this->contenttype;
 
 		$url = $this->http_type . $this->im_yun_url . '/' . $this->version . '/' . $service_name . '/' .$cmd_name . '?' . $parameter;
-//		
-		if($cmd_name !== "pic_up")
+		
+		if($cmd_name !== "pic_up" && $cmd_name != "pic_up_last_slice")
 		{
 			echo "Request Url:\n";
 			echo $url;
@@ -65,8 +65,17 @@ class TimRestAPI extends TimRestInterface
 			echo json_format($req_tmp);
 			echo "\n";
 		}
-		$ret = $this->http_req('https', 'post', $url, $req_data);
-
+		if($cmd_name !== "pic_up")
+		{
+			if($cmd_name == "pic_up_last_slice")
+			{
+				$cmd_name = "pic_up";
+			}
+			$ret = $this->http_req('https', 'post', $url, $req_data);
+		}else
+		{
+			$ret = $this->http_req_multi('https', 'post', $url, $req_tmp);
+		}
 		return $ret;
 
 	}   
@@ -136,7 +145,7 @@ class TimRestAPI extends TimRestInterface
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_HEADER, 0); 
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
-		curl_setopt($ch, CURLOPT_TIMEOUT,3);//超时时间
+		curl_setopt($ch, CURLOPT_TIMEOUT,100000);//超时时间
 
 		try
 		{
@@ -150,6 +159,77 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 
+	/**
+	 * 向Rest服务器发送多个请求(并发)
+	 * @param string $http_type http类型,比如https
+	 * @param string $method 请求方式，比如POST
+	 * @param string $url 请求的url
+	 * @return bool 是否成功
+	 */
+	public static function http_req_multi($http_type, $method, $url, $data)
+	{
+		$mh = curl_multi_init();
+		$ch_list = array();
+		$i = -1;
+		$req_list = array();
+		foreach($data as $req_data)
+		{
+			$i++;
+			$req_data = json_encode($req_data);
+			$ch = curl_init();
+			if ($http_type == 'https://') 
+			{
+				curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+				curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 1); 
+			}   
+
+			if ($method == 'post')
+			{
+				curl_setopt($ch, CURLOPT_POST, 1); 
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $req_data);
+			} else
+			{
+				$url = $url . '?' . $data;
+			}   
+			curl_setopt($ch, CURLOPT_URL, $url);
+			curl_setopt($ch, CURLOPT_HEADER, 0); 
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
+			curl_setopt($ch, CURLOPT_TIMEOUT,100000);//超时时间
+			curl_multi_add_handle($mh, $ch);
+			$ch_list[] = $ch;
+			$req_list[] = $req_data;
+		}
+		try
+		{
+			do{
+				$mret = curl_multi_exec($mh, $active);
+			}while($mret == CURLM_CALL_MULTI_PERFORM);
+
+			while($active and $mret == CURLM_OK){
+				if(curl_multi_select($mh) === -1){
+					usleep(100);
+				}
+				do{
+					$mret = curl_multi_exec($mh, $active);
+				}while($mret == CURLM_CALL_MULTI_PERFORM);
+			}
+			for($i = 0; $i < count($req_list); $i++)
+			{
+//				$req_list[$i] = json_decode($req_list[$i]);
+//				echo json_format($req_list[$i]);
+//				$ret = curl_multi_getcontent($ch_list[$i]);
+//				$ret = json_decode($ret);
+//				echo json_format($ret);
+//				echo "\n\n";
+			}
+		}catch(Exception $e)
+		{
+			curl_close($ch);
+			return json_encode(array('ret'=>0,'msg'=>'failure'));
+		}
+		curl_multi_close($mh);
+		return true;
+	}
 
 	#REST API 访问接口集合
 	#参数详情见RestInterface
@@ -183,31 +263,85 @@ class TimRestAPI extends TimRestInterface
 		
 		#进行base64处理	
 		$fp = fopen($pic_path, "r");
-		$pic_data = chunk_split(base64_encode(fread($fp,$pic_size)));
-		$pic_data = str_replace("\r\n", '', $pic_data);
+		$pic_data = fread($fp, $pic_size);
+		
+		$slice_data = array();
+		$slice_size = array();
+		$SLICE_SIZE = 128*4096;
+		
+		//对文件进行分片
+		for($i = 0; $i < $pic_size; $i = $i + $SLICE_SIZE)
+		{
+			if($i + $SLICE_SIZE > $pic_size)
+			{
+				break;
+			}
+			$slice_tmp = substr($pic_data, $i, $SLICE_SIZE);
+			$slice_tmp = chunk_split(base64_encode($slice_tmp));
+			$slice_tmp = str_replace("\r\n", '', $slice_tmp);
+			$slice_size[] = $SLICE_SIZE;
+			$slice_data[] = $slice_tmp;
+		}
+		
+		//最后一个分片
+		if($i - $SLICE_SIZE < $pic_size)
+		{
+			$slice_size[] = $pic_size-$i;
+			$tmp = substr($pic_data, $i, $pic_size-$i);
+			$slice_size[] = strlen($tmp);
+			$tmp = chunk_split(base64_encode($tmp));
+			$tmp = str_replace("\r\n", '', $tmp);
+			
+			$slice_data[] = $tmp;
+		}
 
-		#构造消息
+		$pic_rand = rand(1, 65535);
+		$time_stamp = time();
+		$req_data_list = array();
+		for($i = 0; $i < count($slice_data)-1; $i++)
+		{
+			#构造消息
+			$msg = array(
+					"From_Account" => $account_id,	//发送者
+					"To_Account" => $receiver,		//接收者
+					"App_Version" => 1.4,		//应用版本号
+					"Seq" => $i+1,						//同一个分片需要保持一致
+					"Timestamp" => $time_stamp,			//同一张图片的不同分片需要保持一致
+					"Random" => $pic_rand,				//同一张图片的不同分片需要保持一致
+					"File_Str_Md5" => $md,			//图片MD5，验证图片的完整性
+					"File_Size" => $pic_size,		//图片原始大小
+					"Busi_Id" => $busi_type,					//群消息:1 c2c消息:2 个人头像：3 群头像：4
+					"PkgFlag" => 1,					//同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
+					"Slice_Offset" => $i*$SLICE_SIZE,			//必须是4K的整数倍
+					"Slice_Size" => $slice_size[$i],		//必须是4K的整数倍,除最后一个分片列外
+					"Slice_Data" => $slice_data[$i]		//PkgFlag=1时，为base64编码
+					); 
+			array_push($req_data_list, $msg);
+		}
+		//将消息序列化为json串
+		$req_data_list = json_encode($req_data_list);
+		$this->api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list);
+
+		#最后一个分片
 		$msg = array(
 				"From_Account" => $account_id,	//发送者
 				"To_Account" => $receiver,		//接收者
 				"App_Version" => 1.4,		//应用版本号
-				"Seq" => 1,						//同一个分片需要保持一致
-				"Timestamp" => time(),			//同一张图片的不同分片需要保持一致
-				"Random" => rand(1, 65535),				//同一张图片的不同分片需要保持一致
+				"Seq" => $i+1,						//同一个分片需要保持一致
+				"Timestamp" => $time_stamp,			//同一张图片的不同分片需要保持一致
+				"Random" => $pic_rand,				//同一张图片的不同分片需要保持一致
 				"File_Str_Md5" => $md,			//图片MD5，验证图片的完整性
 				"File_Size" => $pic_size,		//图片原始大小
 				"Busi_Id" => $busi_type,					//群消息:1 c2c消息:2 个人头像：3 群头像：4
 				"PkgFlag" => 1,					//同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
-				"Slice_Offset" => 0,			//必须是4K的整数倍
-				"Slice_Size" => $pic_size,		//必须是4K的整数倍,除最后一个分片列外
-				"Slice_Data" => $pic_data		//PkgFlag=1时，为base64编码
+				"Slice_Offset" => $i*$SLICE_SIZE,			//必须是4K的整数倍
+				"Slice_Size" => $slice_size[count($slice_data)-1],		//必须是4K的整数倍,除最后一个分片列外
+				"Slice_Data" => $slice_data[count($slice_data)-1]		//PkgFlag=1时，为base64编码
 				); 
-		//将消息序列化为json串
+		
 		$req_data = json_encode($msg);
-		$ret = $this->api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data);
+		$ret = $this->api("openpic", "pic_up_last_slice", $this->identifier, $this->usersig, $req_data);
 		$ret = json_decode($ret, true);
-	//	$tmp = $ret["URL_INFO"];
-	//	$ret = $tmp[0]["DownUrl"];
 		return $ret;
 	}
 

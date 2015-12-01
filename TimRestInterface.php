@@ -49,7 +49,7 @@ abstract class TimRestInterface
 	abstract function openim_send_msg($account_id, $receiver, $text_content);
 
 	/** 
-	 * 发图片消息
+	 * 发图片消息(图片不大于10M)
 	 * @param string $account_id 发送者id
 	 * @param string $receiver 接收方的用户账号
 	 * @param string $pic_path 要发送的图片本地路径
@@ -178,7 +178,7 @@ abstract class TimRestInterface
 
 
     ################################ 关系链管理 ###################################
-    ## 关系链托管方式请详见:关系链系统概述 (http://avc.qcloud.com/wiki/im/) 即时通信云-概述-关系链系统 ##
+    ## 关系链托管方式请详见:关系链系统概述 (http://avc.qcloud.com/wiki2.0/im/) 即时通信云-概述-关系链系统 ##
 	/**
 	 * 建立双方好友关系
 	 * @param string $account_id 发起者id
