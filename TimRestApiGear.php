@@ -75,7 +75,7 @@
 		/**
 		 * 获取usersig
 		 * 36000为usersig的保活期
-		 * signature为获取私钥脚本，详情请见 账户登录集成 http://avc.qcloud.com/wiki/im/ 
+		 * signature为获取私钥脚本，详情请见 账号登录集成 http://avc.qcloud.com/wiki2.0/im/
 		 */
 		if(is_64bit()){
 			$signature = "signature/linux-signature64";
