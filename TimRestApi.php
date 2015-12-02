@@ -34,16 +34,19 @@ class TimRestAPI extends TimRestInterface
 	}
 
 	/** 
-	 * 构造访问REST服务器的参数
+	 * 构造访问REST服务器的参数,并访问REST接口
 	 * @param string $server_name 服务名
 	 * @param string $cmd_name 命令名
 	 * @param string $identifier 用户名
-	 * @param json   $req_data 传递的json结构
+	 * @param string $usersig 用来鉴权的usersig
+	 * @param string $req_data 传递的json结构
+	 * $param bool $print_flag 是否打印请求，默认为打印
 	 * @return string $out 返回的签名字符串
 	 */
-	public function api($service_name, $cmd_name, $identifier, $usersig, $req_data)
+	public function api($service_name, $cmd_name, $identifier, $usersig, $req_data, $print_flag = true)
 	{   
 		
+		//$req_tmp用来做格式化输出
 		$req_tmp = json_decode($req_data, true);
 		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
 		$parameter =  "sdkappid=" . $this->sdkappid
@@ -56,7 +59,7 @@ class TimRestAPI extends TimRestInterface
 
 		$url = $this->http_type . $this->im_yun_url . '/' . $this->version . '/' . $service_name . '/' .$cmd_name . '?' . $parameter;
 		
-		if($cmd_name !== "pic_up" && $cmd_name != "pic_up_last_slice")
+		if($print_flag)
 		{
 			echo "Request Url:\n";
 			echo $url;
@@ -65,20 +68,50 @@ class TimRestAPI extends TimRestInterface
 			echo json_format($req_tmp);
 			echo "\n";
 		}
-		if($cmd_name !== "pic_up")
-		{
-			if($cmd_name == "pic_up_last_slice")
-			{
-				$cmd_name = "pic_up";
-			}
-			$ret = $this->http_req('https', 'post', $url, $req_data);
-		}else
-		{
-			$ret = $this->http_req_multi('https', 'post', $url, $req_tmp);
-		}
+		$ret = $this->http_req('https', 'post', $url, $req_data);
 		return $ret;
 
 	}   
+
+	/** 
+	 * 构造访问REST服务器参数,并发访问REST服务器
+	 * @param string $server_name 服务名
+	 * @param string $cmd_name 命令名
+	 * @param string $identifier 用户名
+	 * @param string $usersig 用来鉴权的usersig
+	 * @param string $req_data 传递的json结构
+	 * $param bool $print_flag 是否打印请求，默认为打印
+	 * @return string $out 返回的签名字符串
+	 */
+	public function multi_api($service_name, $cmd_name, $identifier, $usersig, $req_data, $print_flag = true)
+	{   
+		
+		//$req_tmp用来做格式化控制台输出,同时作为多路访问需要的数组结构
+		$req_tmp = json_decode($req_data, true);
+		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
+		$parameter =  "sdkappid=" . $this->sdkappid
+			. "&appidat3rd=" . $this->appidat3rd
+			. "&identifier=" . $this->identifier
+			. "&accountype=" . $this->accountype
+			. "&usersig=" . $this->usersig
+			. "&apn=" . $this->apn
+			. "&contenttype=" . $this->contenttype;
+
+		$url = $this->http_type . $this->im_yun_url . '/' . $this->version . '/' . $service_name . '/' .$cmd_name . '?' . $parameter;
+		
+		if($print_flag)
+		{
+			echo "Request Url:\n";
+			echo $url;
+			echo "\n";
+			echo "Request Body:\n";
+			echo json_format($req_tmp);
+			echo "\n";
+		}
+		$ret = $this->http_req_multi('https', 'post', $url, $req_tmp);
+		return $ret;
+
+	}
 
 	/**
 	 * 独立模式根据Identifier生成UserSig的方法
@@ -213,15 +246,6 @@ class TimRestAPI extends TimRestInterface
 					$mret = curl_multi_exec($mh, $active);
 				}while($mret == CURLM_CALL_MULTI_PERFORM);
 			}
-			for($i = 0; $i < count($req_list); $i++)
-			{
-//				$req_list[$i] = json_decode($req_list[$i]);
-//				echo json_format($req_list[$i]);
-//				$ret = curl_multi_getcontent($ch_list[$i]);
-//				$ret = json_decode($ret);
-//				echo json_format($ret);
-//				echo "\n\n";
-			}
 		}catch(Exception $e)
 		{
 			curl_close($ch);
@@ -253,12 +277,12 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 	
-	public function openpic_pic_up($account_id, $receiver, $pic_path, $busi_type)
+	public function openpic_pic_upload($account_id, $receiver, $pic_path, $busi_type)
 	{
 		
-		#获取长度和md
+		#获取长度和md5值
 		$pic_data = file_get_contents($pic_path);
-		$md = md5($pic_data);
+		$md5 = md5($pic_data);
 		$pic_size = filesize($pic_path);
 		
 		#进行base64处理	
@@ -308,7 +332,7 @@ class TimRestAPI extends TimRestInterface
 					"Seq" => $i+1,						//同一个分片需要保持一致
 					"Timestamp" => $time_stamp,			//同一张图片的不同分片需要保持一致
 					"Random" => $pic_rand,				//同一张图片的不同分片需要保持一致
-					"File_Str_Md5" => $md,			//图片MD5，验证图片的完整性
+					"File_Str_Md5" => $md5,			//图片MD5，验证图片的完整性
 					"File_Size" => $pic_size,		//图片原始大小
 					"Busi_Id" => $busi_type,					//群消息:1 c2c消息:2 个人头像：3 群头像：4
 					"PkgFlag" => 1,					//同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
@@ -320,7 +344,7 @@ class TimRestAPI extends TimRestInterface
 		}
 		//将消息序列化为json串
 		$req_data_list = json_encode($req_data_list);
-		$this->api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list);
+		$this->multi_api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list, false);
 
 		#最后一个分片
 		$msg = array(
@@ -330,7 +354,7 @@ class TimRestAPI extends TimRestInterface
 				"Seq" => $i+1,						//同一个分片需要保持一致
 				"Timestamp" => $time_stamp,			//同一张图片的不同分片需要保持一致
 				"Random" => $pic_rand,				//同一张图片的不同分片需要保持一致
-				"File_Str_Md5" => $md,			//图片MD5，验证图片的完整性
+				"File_Str_Md5" => $md5,			//图片MD5，验证图片的完整性
 				"File_Size" => $pic_size,		//图片原始大小
 				"Busi_Id" => $busi_type,					//群消息:1 c2c消息:2 个人头像：3 群头像：4
 				"PkgFlag" => 1,					//同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
@@ -340,7 +364,7 @@ class TimRestAPI extends TimRestInterface
 				); 
 		
 		$req_data = json_encode($msg);
-		$ret = $this->api("openpic", "pic_up_last_slice", $this->identifier, $this->usersig, $req_data);
+		$ret = $this->api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data, false);
 		$ret = json_decode($ret, true);
 		return $ret;
 	}
@@ -351,7 +375,7 @@ class TimRestAPI extends TimRestInterface
 		#构造高级接口所需参数
 		//上传图片并获取url
 		$busi_type = 2; //表示C2C消息
-		$ret =  $this->openpic_pic_up($account_id, $receiver, $pic_path, $busi_type);
+		$ret =  $this->openpic_pic_upload($account_id, $receiver, $pic_path, $busi_type);
 		$tmp = $ret["URL_INFO"];
 		
 		$uuid = $ret["File_UUID"];
@@ -458,7 +482,7 @@ class TimRestAPI extends TimRestInterface
 		#构造高级接口所需参数
 		//上传图片并获取url
 		$busi_type = 2; //表示C2C消息
-		$ret =  $this->openpic_pic_up($this->identifier, $account_list[0], $pic_path, $busi_type);
+		$ret =  $this->openpic_pic_upload($this->identifier, $account_list[0], $pic_path, $busi_type);
 		$tmp = $ret["URL_INFO"];
 		
 		$uuid = $ret["File_UUID"];
@@ -819,7 +843,7 @@ class TimRestAPI extends TimRestInterface
 				'Notification' => $info_set['notification'],
 				'FaceUrl' => $info_set['face_url'],
 				'MaxMemberCount' => $info_set['max_member_num'],
-				'ApplyJoinOption' => $info_set['apply_join'],
+			//	'ApplyJoinOption' => $info_set['apply_join'],
 				'MemberList' => $mem_list
 				);  
 		#将消息序列化为json串
@@ -1138,7 +1162,7 @@ class TimRestAPI extends TimRestInterface
 		#构造高级接口所需参数
 		//上传图片并获取url
 		$busi_type = 1; //表示群消息
-		$ret =  $this->openpic_pic_up($account_id, $group_id, $pic_path, $busi_type);
+		$ret =  $this->openpic_pic_upload($account_id, $group_id, $pic_path, $busi_type);
 		$tmp = $ret["URL_INFO"];
 		
 		$uuid = $ret["File_UUID"];
