@@ -78,9 +78,19 @@
 		 * signature为获取私钥脚本，详情请见 账号登录集成 http://avc.qcloud.com/wiki2.0/im/
 		 */
 		if(is_64bit()){
-			$signature = "signature/linux-signature64";
+			if(PATH_SEPARATOR==':'){
+				$signature = "signature/linux-signature64";
+			}else{
+				$signature = "signature\\windows-signature64.exe";
+			}
+			
 		}else{
-			$signature = "signature/linux-signature32";
+			if(PATH_SEPARATOR==':')
+			{
+				$signature = "signature/linux-signature32";
+			}else{
+				$signature = "signature\\windows-signature32.exe";
+			}
 		}
 		$ret = $api->generate_user_sig($identifier, '36000', $private_pem_path, $signature);
 		if($ret == null || strstr($ret[0], "failed")){

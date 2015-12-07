@@ -126,10 +126,7 @@ class TimRestAPI extends TimRestInterface
 		# 这里需要写绝对路径，开发者根据自己的路径进行调整
 		$command = escapeshellarg($tool_path)
 			. ' '. escapeshellarg($protected_key_path)
-			. ' ' . escapeshellarg($expiry_after)
 			. ' ' . escapeshellarg($this->sdkappid)
-			. ' ' . escapeshellarg($this->accountype)
-			. ' ' . escapeshellarg($this->appidat3rd)
 			. ' ' .escapeshellarg($identifier);
 		$ret = exec($command, $out, $status);
 		if( $status == -1)
@@ -161,7 +158,7 @@ class TimRestAPI extends TimRestInterface
 	public static function http_req($http_type, $method, $url, $data)
 	{
 		$ch = curl_init();
-		if ($http_type == 'https://') 
+		if (strstr($http_type, 'https'))
 		{
 			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 1); 
@@ -174,7 +171,7 @@ class TimRestAPI extends TimRestInterface
 		} else
 		{
 			$url = $url . '?' . $data;
-		}   
+		}		
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_HEADER, 0); 
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
