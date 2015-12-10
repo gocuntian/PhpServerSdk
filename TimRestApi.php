@@ -49,14 +49,15 @@ class TimRestAPI extends TimRestInterface
 		//$req_tmp用来做格式化输出
 		$req_tmp = json_decode($req_data, true);
 		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
-		$parameter =  "sdkappid=" . $this->sdkappid
-			. "&appidat3rd=" . $this->appidat3rd
-			. "&identifier=" . $this->identifier
-			. "&accountype=" . $this->accountype
-			. "&usersig=" . $this->usersig
-			. "&apn=" . $this->apn
-			. "&contenttype=" . $this->contenttype;
-
+//        $parameter =  "sdkappid=" . $this->sdkappid
+//            . "&identifier=" . $this->identifier
+//            . "&usersig=" . $this->usersig
+//            . "&contenttype=" . $this->contenttype;
+//
+        $parameter =  "usersig=" . $this->usersig
+            . "&identifier=" . $this->identifier
+            . "&sdkappid=" . $this->sdkappid
+            . "&contenttype=" . $this->contenttype;
 		$url = $this->http_type . $this->im_yun_url . '/' . $this->version . '/' . $service_name . '/' .$cmd_name . '?' . $parameter;
 		
 		if($print_flag)
@@ -161,7 +162,7 @@ class TimRestAPI extends TimRestInterface
 		if (strstr($http_type, 'https'))
 		{
 			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 1); 
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0); 
 		}   
 
 		if ($method == 'post')
@@ -469,7 +470,7 @@ class TimRestAPI extends TimRestInterface
 		//将创建的元素$msg_content_elem, 加入array $msg_content
 		array_push($msg_content, $msg_content_elem);
 		
-		$ret = $this->openim_batch_sendmsg2($account_list, $msg_content);
+        $ret = $this->openim_batch_sendmsg2($account_list, $msg_content);
 		return $ret;
 	}
 
@@ -537,7 +538,7 @@ class TimRestAPI extends TimRestInterface
 		//将创建的元素$msg_content_elem, 加入array $msg_content
 		array_push($msg_content, $msg_content_elem);
 		
-		$ret = $this->openim_batch_sendmsg2($account_list, $msg_content);
+        $ret = $this->openim_batch_sendmsg2($account_list, $msg_content);
 		return $ret;
 	}
 
@@ -554,7 +555,7 @@ class TimRestAPI extends TimRestInterface
 		$req_data = json_encode($msg);
 
 		$ret = $this->api("openim", "batchsendmsg", $this->identifier, $this->usersig, $req_data);
-		$ret = json_decode($ret, true);
+        $ret = json_decode($ret, true);
 		return $ret;
 	}
 
