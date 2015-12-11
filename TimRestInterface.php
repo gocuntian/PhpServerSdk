@@ -15,11 +15,10 @@ abstract class TimRestInterface
 	/** 
 	 * 初始化函数
 	 * @param string $sdkappid 应用的appid
-	 * @param int $accountype 应用账号类型
 	 * @param string $identifier 访问接口的用户
 	 * @return bool 返回true/false
 	 */
-	abstract function init($sdkappid, $accountype, $identifier);	
+	abstract function init($sdkappid, $identifier);	
 
 	/**  
 	 * 独立模式根据Identifier生成UserSig的方法
@@ -114,8 +113,27 @@ abstract class TimRestInterface
 	 */
 	abstract function openim_batch_sendmsg2($account_list, $msg_content);
 
+    ################################ 帐号管理 ###################################
 
-	################################ 资料管理 ###################################
+    /**
+     * 独立模式帐号同步接口
+     * @param string $identifier 用户名
+     * @param string $nick 用户昵称
+     * @param string $face_url 用户头像URL
+     * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+     */
+    abstract function account_import($identifier, $nick, $face_url);
+
+    /**
+     * 独立模式帐号同步接口
+     * @param string $Identifier 为用户申请同步的帐号，长度为4-24个字符
+     * @param string $IdentifierType Identifier的类型，1:手机号(国家码-手机号) 2:邮箱 3:字符串帐号
+     * @param string $Password Identifier的密码，长度为8-16个字符
+     * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+     */
+    abstract public function register_account($identifier, $identifierType, $password);
+
+    ################################ 资料管理 ###################################
 	
 	/** 
 	 * 获取用户资料
@@ -329,8 +347,8 @@ abstract class TimRestInterface
 	 *	 array_push($account_list, $mem_account);  //$mem_account为用户id，需要用户传递
      *
 	 * @return array 通过解析REST接口json返回包得到的关联数组，包含新建的群号、成功与否、错误提示等字段
-	 */
-	abstract function group_create_group2($group_type, $group_name, $owner_id, $info_set, $mem_list);
+     */
+    abstract function group_create_group2($group_type, $group_name, $owner_id, $info_set, $mem_list);
 
 	/**
 	 * 获取群组详细信息

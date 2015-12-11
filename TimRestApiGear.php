@@ -5,7 +5,6 @@
 	$begin_time = microtime(true);
 	/**
 	 * sdkappid 是app的sdkappid
-	 * account_type 为app的accounttype
 	 * identifier 是用户帐号
 	 * private_pem_path 为私钥在本地位置
 	 * server_name 是服务类型
@@ -21,7 +20,9 @@
 		printf("  php TimRestApiGear.php openim sendmsg (account_id) (receiver) (text_content)\n   单发消息\n");
 		printf("  php TimRestApiGear.php openim sendmsg_pic (account_id) (receiver) (pic_path)\n   单发图片(图片不超过5M)\n");
 		printf("  php TimRestApiGear.php openim batchsendmsg (account_id1,account_id2,...) (text_content)\n   批量发消息(接收者id组以逗号分隔)\n\n");
-		printf("  php TimRestApiGear.php openim batchsendmsg_pic (account_id1,account_id2,...) (pic_path)\n   批量发图片(接收者id组以逗号分隔,图片不超过5M)\n\n");
+        printf("  php TimRestApiGear.php openim batchsendmsg_pic (account_id1,account_id2,...) (pic_path)\n   批量发图片(接收者id组以逗号分隔,图片不超过5M)\n\n");
+        printf("  php TimRestApiGear.php im_open_login_svc account_import (identifier) (nick) (face_url)\n   独立模式同步帐号\n");
+        printf("  php TimRestApiGear.php registration_service register_account (identifier) (identifierType) (password)\n   托管模式存量帐号导入\n");
 		printf("  php TimRestApiGear.php profile portrait_get (account_id)\n   获取用户资料\n");
 		printf("  php TimRestApiGear.php profile portrait_set (account_id) (new_name)\n   修改用户名称\n\n");
 		printf("  php TimRestApiGear.php sns friend_import (account_id) (receiver)\n   建立好友关系\n");
@@ -32,7 +33,7 @@
 		printf("  php TimRestApiGear.php sns friend_get_list (account_id) (frd_id)\n   获取用户指定好友\n\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_appid_group_list\n   获取APP中所有群组信息(默认获取50个)\n");
 		printf("  php TimRestApiGear.php group_open_http_svc create_group (group_type) (group_name) (owner_id)\n   创建群组(max_member_num默认为500，");
-		printf("Public类型群组验证方式默认为需要验证，Private类型默认为禁止申请，ChatRoom类型默认为自由加入)\n");
+        printf("Public类型群组验证方式默认为需要验证，Private类型默认为禁止申请，ChatRoom类型默认为自由加入)\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_group_info (group_id)\n   获取指定群组信息\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_group_member_info (group_id) (limit) (offset)\n   获取群组成员信息\n");
 		printf("  php TimRestApiGear.php group_open_http_svc modify_group_base_info (group_id) (group_name)\n   修改群组名称\n");
@@ -55,13 +56,12 @@
 	$json_config = file_get_contents($filename);
 	$app_config = json_decode($json_config, true);
 	$sdkappid = $app_config["sdkappid"];
-	$account_type = $app_config["account_type"];
 	$identifier = $app_config["identifier"];
 	$private_pem_path = $app_config["private_pem_path"];
 	$user_sig = $app_config["user_sig"];
-	
+
 	$api = createRestAPI();
-	$api->init($sdkappid, $account_type, $identifier);
+	$api->init($sdkappid, $identifier);
 	
 	if($private_pem_path != "")
 	{
@@ -114,7 +114,9 @@
 			"openim.sendmsg" => 'send_msg',
 			"openim.sendmsg_pic" => 'send_msg_pic',
 			"openim.batchsendmsg" => 'batch_sendmsg',
-			"openim.batchsendmsg_pic" => 'batch_sendmsg_pic',
+            "openim.batchsendmsg_pic" => 'batch_sendmsg_pic',
+            "im_open_login_svc.account_import" => 'account_import',
+            "registration_service.register_account" => 'register_account',
 			"profile.portrait_get" => 'portrait_get',
 			"profile.portrait_set" => 'portrait_set',
 			"sns.friend_import" => 'friend_import',
@@ -125,7 +127,8 @@
 			"sns.friend_get_list" => 'friend_get_list',
 			"group_open_http_svc.get_appid_group_list" => 'get_appid_group_list',
 			"group_open_http_svc.create_group" => 'create_group',
-			"group_open_http_svc.get_group_info" => 'get_group_info',
+            "group_open_http_svc.change_group_owner" => 'change_group_owner',
+            "group_open_http_svc.get_group_info" => 'get_group_info',
 			"group_open_http_svc.get_group_member_info" => 'get_group_member_info',
 			"group_open_http_svc.modify_group_base_info" => 'modify_group_base_info',
 			"group_open_http_svc.add_group_member" => 'add_group_member',
@@ -195,7 +198,7 @@
 	}
 
 	/**
-	 * 单发信息
+	 * 批量发信息
 	 **/
 	function batch_sendmsg($api, $data_list)
 	{
@@ -210,6 +213,9 @@
 		return $ret;
 	}
 
+	/**
+	 * 批量发图片
+	 **/
 	function batch_sendmsg_pic($api, $data_list)
 	{
 
@@ -221,7 +227,37 @@
 		$account_list = explode(",", $account_id_set);
 		$ret = $api->openim_batch_sendmsg_pic($account_list, $pic_path);
 		return $ret;
-	}
+    }
+
+    /**
+     * 独立模式帐号同步
+     **/
+    function account_import($api, $data_list)
+    {
+
+        if($GLOBALS['argc'] < 6){
+            printf("profile.portrait_get 需要三个参数: 帐号id, 用户昵称, 头像url\n");
+            return "Fail: not enough paragram for im_open_login_svc.account_import";
+        }
+        list($identifier, $nick, $face_url) = $data_list;
+        $ret = $api->account_import($identifier, $nick, $face_url);
+        return $ret;
+    }
+
+    /**
+     * 托管模式存量帐号导入
+     **/
+    function register_account($api, $data_list)
+    {
+
+        if($GLOBALS['argc'] < 6){
+            printf("profile.portrait_get 需要三个参数: 帐号id, 帐号类型, 帐号密码\n");
+            return "Fail: not enough paragram for registration_service.register_account";
+        }
+        list($identifier, $identifier_type, $password) = $data_list;
+        $ret = $api->register_account($identifier, $identifier_type, $password);
+        return $ret;
+    }
 
 	/**
 	 * 获取用户信息

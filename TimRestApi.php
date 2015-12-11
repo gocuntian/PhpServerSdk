@@ -4,15 +4,13 @@ class TimRestAPI extends TimRestInterface
 {
 	#app基本信息
 	protected $sdkappid = 0;
-	protected $accountype = 0;
-	protected $appidat3rd = 0;
 	protected $usersig = '';
 	protected $identifier = '';
 
 	#开放IM https接口参数, 一般不需要修改
 	protected $http_type = 'https://';
 	protected $method = 'post';
-	protected $im_yun_url = 'yun.tim.qq.com';
+	protected $im_yun_url = 'console.tim.qq.com';
 	protected $version = 'v4';
 	protected $contenttype = 'json';
 	protected $apn = '0';
@@ -21,15 +19,12 @@ class TimRestAPI extends TimRestInterface
 	/**
 	 * 初始化函数
 	 * @param int $sdkappid 应用的appid
-	 * @param int $accountype 应用账号类型
 	 * @param string $identifier 访问接口的用户
 	 */
-	function init($sdkappid, $accountype, $identifier)
+	function init($sdkappid, $identifier)
 	{
 	
 		$this->sdkappid = $sdkappid;
-		$this->accountype = $accountype;
-		$this->appidat3rd = $sdkappid;
 		$this->identifier = $identifier;
 	}
 
@@ -45,15 +40,9 @@ class TimRestAPI extends TimRestInterface
 	 */
 	public function api($service_name, $cmd_name, $identifier, $usersig, $req_data, $print_flag = true)
 	{   
-		
 		//$req_tmp用来做格式化输出
-		$req_tmp = json_decode($req_data, true);
+        $req_tmp = json_decode($req_data, true);
 		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
-//        $parameter =  "sdkappid=" . $this->sdkappid
-//            . "&identifier=" . $this->identifier
-//            . "&usersig=" . $this->usersig
-//            . "&contenttype=" . $this->contenttype;
-//
         $parameter =  "usersig=" . $this->usersig
             . "&identifier=" . $this->identifier
             . "&sdkappid=" . $this->sdkappid
@@ -90,13 +79,10 @@ class TimRestAPI extends TimRestInterface
 		//$req_tmp用来做格式化控制台输出,同时作为多路访问需要的数组结构
 		$req_tmp = json_decode($req_data, true);
 		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
-		$parameter =  "sdkappid=" . $this->sdkappid
-			. "&appidat3rd=" . $this->appidat3rd
-			. "&identifier=" . $this->identifier
-			. "&accountype=" . $this->accountype
-			. "&usersig=" . $this->usersig
-			. "&apn=" . $this->apn
-			. "&contenttype=" . $this->contenttype;
+        $parameter =  "usersig=" . $this->usersig
+            . "&identifier=" . $this->identifier
+            . "&sdkappid=" . $this->sdkappid
+            . "&contenttype=" . $this->contenttype;
 
 		$url = $this->http_type . $this->im_yun_url . '/' . $this->version . '/' . $service_name . '/' .$cmd_name . '?' . $parameter;
 		
@@ -559,6 +545,41 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 
+    public function account_import($identifier, $nick, $face_url)
+    {
+
+        #构造新消息 
+        $msg = array(
+            'Identifier' => $identifier,
+            'Nick' => $nick,
+            'FaceUrl' => $face_url,
+        );
+        #将消息序列化为json串
+        $req_data = json_encode($msg);
+
+        $ret = $this->api("im_open_login_svc", "account_import", $this->identifier, $this->usersig, $req_data);
+        $ret = json_decode($ret, true);
+        return $ret;
+    }
+
+    public function register_account($identifier, $identifierType, $password)
+    {
+
+        #构造新消息 
+        $msg = array(
+            'Identifier' => $identifier,
+            'IdentifierType' => (int)$identifierType,
+            'Password' => $password,
+        );
+        #将消息序列化为json串
+        $req_data = json_encode($msg);
+
+        $ret = $this->api("registration_service", "register_account_v1", $this->identifier, $this->usersig, $req_data);
+        $ret = json_decode($ret, true);
+        var_dump($ret);
+        return $ret;
+    }
+                
 	public function profile_portrait_get($account_id)
 	{
 
@@ -1241,7 +1262,7 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 	
-	public function group_send_group_system_notification($group_id, $text_content, $receiver_id)
+	function group_send_group_system_notification($group_id, $text_content, $receiver_id)
 	{
 		
 		#构造高级接口所需参数
@@ -1252,7 +1273,8 @@ class TimRestAPI extends TimRestInterface
 		$ret = $this->group_send_group_system_notification2($group_id, $text_content, $receiver_list);
 		return $ret;
 	}
-	public function group_send_group_system_notification2($group_id, $content, $receiver_list)
+    
+    function group_send_group_system_notification2($group_id, $content, $receiver_list)
 	{
 
 		#构造新消息 
@@ -1269,7 +1291,7 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 
-	public function comm_rest($server, $command, $req_body)
+	function comm_rest($server, $command, $req_body)
 	{   
 
 		#将消息序列化为json串
