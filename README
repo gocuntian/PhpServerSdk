@@ -19,7 +19,6 @@ TimRestApiGear.php 为使用接口示例工具
 TimRestApi.php 为接口具体实现。
 TimRestInterface.php 为访问rest api示例的接口集合。
 
-注意：1. 该工具暂时仅支持linux环境。
 
 使用步骤:
 

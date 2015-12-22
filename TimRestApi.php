@@ -41,7 +41,7 @@ class TimRestAPI extends TimRestInterface
 	public function api($service_name, $cmd_name, $identifier, $usersig, $req_data, $print_flag = true)
 	{   
 		//$req_tmp用来做格式化输出
-        $req_tmp = json_decode($req_data, true);
+		$req_tmp = json_decode($req_data, true);
 		# 构建HTTP请求参数，具体格式请参考 REST API接口文档 (http://avc.qcloud.com/wiki/im/)(即时通信云-数据管理REST接口)
         $parameter =  "usersig=" . $this->usersig
             . "&identifier=" . $this->identifier
@@ -94,9 +94,9 @@ class TimRestAPI extends TimRestInterface
 			echo "Request Body:\n";
 			echo json_format($req_tmp);
 			echo "\n";
-		}
+        }
 		$ret = $this->http_req_multi('https', 'post', $url, $req_tmp);
-		return $ret;
+        return $ret;
 
 	}
 
@@ -234,7 +234,18 @@ class TimRestAPI extends TimRestInterface
 		{
 			curl_close($ch);
 			return json_encode(array('ret'=>0,'msg'=>'failure'));
-		}
+        }
+        for($i = 0; $i < count($ch_list); $i++)
+        {
+            $ret = curl_multi_getcontent($ch_list[$i]);
+            if(strstr($ret, "URL_INFO"))
+            {
+		        curl_multi_close($mh);
+                return $ret;
+            }
+            $ret = json_decode($ret, true);
+            echo json_format($ret);
+        }
 		curl_multi_close($mh);
 		return true;
 	}
@@ -275,7 +286,7 @@ class TimRestAPI extends TimRestInterface
 		
 		$slice_data = array();
 		$slice_size = array();
-		$SLICE_SIZE = 128*4096;
+		$SLICE_SIZE = 32*4096;
 		
 		//对文件进行分片
 		for($i = 0; $i < $pic_size; $i = $i + $SLICE_SIZE)
@@ -305,32 +316,53 @@ class TimRestAPI extends TimRestInterface
 
 		$pic_rand = rand(1, 65535);
 		$time_stamp = time();
-		$req_data_list = array();
-		for($i = 0; $i < count($slice_data)-1; $i++)
-		{
-			#构造消息
-			$msg = array(
-					"From_Account" => $account_id,	//发送者
-					"To_Account" => $receiver,		//接收者
-					"App_Version" => 1.4,		//应用版本号
-					"Seq" => $i+1,						//同一个分片需要保持一致
-					"Timestamp" => $time_stamp,			//同一张图片的不同分片需要保持一致
-					"Random" => $pic_rand,				//同一张图片的不同分片需要保持一致
-					"File_Str_Md5" => $md5,			//图片MD5，验证图片的完整性
-					"File_Size" => $pic_size,		//图片原始大小
-					"Busi_Id" => $busi_type,					//群消息:1 c2c消息:2 个人头像：3 群头像：4
-					"PkgFlag" => 1,					//同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
-					"Slice_Offset" => $i*$SLICE_SIZE,			//必须是4K的整数倍
-					"Slice_Size" => $slice_size[$i],		//必须是4K的整数倍,除最后一个分片列外
-					"Slice_Data" => $slice_data[$i]		//PkgFlag=1时，为base64编码
-					); 
-			array_push($req_data_list, $msg);
-		}
-		//将消息序列化为json串
-		$req_data_list = json_encode($req_data_list);
-		$this->multi_api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list, false);
+        $req_data_list = array();
+        $sentOut = 0;
+        printf("handle %d segments\n", count($slice_data)-1);
+        for($i = 0; $i < count($slice_data)-1; $i++)
+        {
+            #构造消息
+            $msg = array(
+                "From_Account" => $account_id,  //发送者
+                "To_Account" => $receiver,      //接收者
+                "App_Version" => 1.4,       //应用版本号
+                "Seq" => $i+1,                      //同一个分片需要保持一致
+                "Timestamp" => $time_stamp,         //同一张图片的不同分片需要保持一致
+                "Random" => $pic_rand,              //同一张图片的不同分片需要保持一致
+                "File_Str_Md5" => $md5,         //图片MD5，验证图片的完整性
+                "File_Size" => $pic_size,       //图片原始大小
+                "Busi_Id" => $busi_type,                    //群消息:1 c2c消息:2 个人头像：3 群头像：4
+                "PkgFlag" => 1,                 //同一张图片要保持一致: 0表示图片数据没有被处理 ；1-表示图片经过base64编码，固定为1
+                "Slice_Offset" => $i*$SLICE_SIZE,           //必须是4K的整数倍
+                "Slice_Size" => $slice_size[$i],        //必须是4K的整数倍,除最后一个分片列外
+                "Slice_Data" => $slice_data[$i]     //PkgFlag=1时，为base64编码
+            );
+            array_push($req_data_list, $msg);
+            $sentOut = 0;
+            if ($i != 0 && ($i+1) % 4 == 0)
+            {
+                //将消息序列化为json串
+                $req_data_list = json_encode($req_data_list);
+                printf("\ni = %d, call multi_api once\n", $i);
+                $ret = $this->multi_api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list, false);
+                if(gettype($ret) == "string")
+                {
+                    $ret = json_decode($ret, true);
+                    return $ret;
+                }
+                $req_data_list = array();
+                $sentOut = 1;
+            }
+        }
 
-		#最后一个分片
+        if ($sentOut == 0)
+        {
+            $req_data_list = json_encode($req_data_list);
+            printf("\ni = %d, call multi_api once\n", $i);
+            $this->multi_api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data_list, false);
+        }
+        
+        #最后一个分片
 		$msg = array(
 				"From_Account" => $account_id,	//发送者
 				"To_Account" => $receiver,		//接收者
@@ -349,7 +381,8 @@ class TimRestAPI extends TimRestInterface
 		
 		$req_data = json_encode($msg);
 		$ret = $this->api("openpic", "pic_up", $this->identifier, $this->usersig, $req_data, false);
-		$ret = json_decode($ret, true);
+        $ret = json_decode($ret, true);
+        echo json_format($ret);
 		return $ret;
 	}
 
@@ -568,7 +601,7 @@ class TimRestAPI extends TimRestInterface
         #构造新消息 
         $msg = array(
             'Identifier' => $identifier,
-            'IdentifierType' => (int)$identifierType,
+            'IdentifierType' => $identifierType,
             'Password' => $password,
         );
         #将消息序列化为json串
@@ -576,7 +609,6 @@ class TimRestAPI extends TimRestInterface
 
         $ret = $this->api("registration_service", "register_account_v1", $this->identifier, $this->usersig, $req_data);
         $ret = json_decode($ret, true);
-        var_dump($ret);
         return $ret;
     }
                 
@@ -873,6 +905,21 @@ class TimRestAPI extends TimRestInterface
 		return $ret;
 	}
 
+    function group_change_group_owner($group_id, $new_owner)
+    {    
+
+        #构造新消息
+        $msg = array(
+            'GroupId' => $group_id,
+            'NewOwner_Account' => $new_owner
+        );   
+        #将消息序列化为json串
+        $req_data = json_encode($msg);
+
+        $ret = $this->api("group_open_http_svc", "change_group_owner", $this->identifier, $this->usersig, $req_data);
+        $ret = json_decode($ret, true);
+        return $ret;
+    }                                                                                                                        
 	function group_get_group_info($group_id)
 	{
 		
@@ -1300,8 +1347,102 @@ class TimRestAPI extends TimRestInterface
 		$ret = $this->api($server, $command, $this->identifier, $this->usersig, $req_data);
 		$ret = json_decode($ret, true);
 		return $ret;
-	}   
+    }
 
+    function group_import_group_member($group_id, $member_id, $role) 
+    {
+
+        #构造高级接口所需参数
+        $member_list = array();
+        $member_elem = array(
+            "Member_Account" => $member_id,
+            "Role" => $role
+        );
+        array_push($member_list, $member_elem);
+		$ret = $this->group_import_group_member2($group_id, $member_list);
+		return $ret;
+    }  
+
+    function group_import_group_member2($group_id, $member_list)
+    {
+
+		#构造新消息 
+		$msg = array(
+				"GroupId" => $group_id,
+				"MemberList" => $member_list,
+				);  
+		#将消息序列化为json串
+		$req_data = json_encode($msg);
+
+		$ret = $this->api("group_open_http_svc", "import_group_member", $this->identifier, $this->usersig, $req_data);
+		$ret = json_decode($ret, true);
+		return $ret;
+    } 
+
+    function group_import_group_msg($group_id, $from_account, $text)
+    {
+        
+        #构造高级接口所需参数
+
+        //构造MsgBody
+        $msg_content = array(
+            "Text" => $text
+        );
+        $msg_body_elem = array(
+            "MsgType" => "TIMTextElem",
+            "MsgContent" => $msg_content,
+        );
+        $msg_body_list = array();
+        array_push($msg_body_list, $msg_body_elem);
+
+        //构造MsgList的一个元素
+        $msg_list_elem = array(
+            "From_Account" => $from_account,
+            "SendTime" => time(),
+            "Random" => rand(1, 65535),
+            "MsgBody" => $msg_body_list
+        );
+
+        //构造MsgList
+        $msg_list = array();
+        array_push($msg_list, $msg_list_elem);
+
+		$ret = $this->group_import_group_msg2($group_id, $msg_list);
+		return $ret;
+    }
+
+    function group_import_group_msg2($group_id, $msg_list)
+    {
+
+		#构造新消息 
+		$msg = array(
+				"GroupId" => $group_id,
+				"MsgList" => $msg_list,
+            );
+        var_dump($msg);  
+		#将消息序列化为json串
+		$req_data = json_encode($msg);
+
+		$ret = $this->api("group_open_http_svc", "import_group_msg", $this->identifier, $this->usersig, $req_data);
+		$ret = json_decode($ret, true);
+		return $ret;
+    }
+    function group_set_unread_msg_num($group_id, $member_account, $unread_msg_num)
+    {
+
+		#构造新消息 
+		$msg = array(
+				"GroupId" => $group_id,
+                "Member_Account" => $member_account,
+                "UnreadMsgNum" => (int)$unread_msg_num
+				);  
+		#将消息序列化为json串
+		$req_data = json_encode($msg);
+
+		$ret = $this->api("group_open_http_svc", "set_unread_msg_num", $this->identifier, $this->usersig, $req_data);
+		$ret = json_decode($ret, true);
+		return $ret;
+    }
 };
 
 //辅助过滤器类

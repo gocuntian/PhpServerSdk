@@ -350,6 +350,14 @@ abstract class TimRestInterface
      */
     abstract function group_create_group2($group_type, $group_name, $owner_id, $info_set, $mem_list);
 
+    /** 
+     * 转让群组
+     * @param string $group_id 需要转让的群组id
+     * @param string $new_owner 需要设置的新群主id
+     * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+     */
+    abstract function group_change_group_owner($group_id, $new_owner);
+
 	/**
 	 * 获取群组详细信息
 	 * @param string $group_id 需要获取信息的群组id
@@ -613,16 +621,89 @@ abstract class TimRestInterface
 	 * @param string $content 系统通知内容，支持二进制数组
 	 * @param array $receiver_list 接收此系统提示的用户id集合, 为空表示发送给全员. php构造示例:
 	 *	
-	 *	$receiver_list = array(
-	 *		"peter",
-	 *		"leckie"
-	 *	)
+	 *   $receiver_list = array(
+	 *		 "peter",
+	 *		 "leckie"
+	 *	 )
 	 * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
 	 */
 	abstract function group_send_group_system_notification2($group_id, $content, $receiver_list);
 
+	/**
+	 * 导入群成员(只导入一个成员, 入群时间默认为当前)
+	 * @param string $group_id 要操作的群组id
+     * @param string $member_id 要导入的用户id
+     * @param string $role 要导入的用户的身份(现可填值只有Admin)，不填默认为Member
+	 * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+	 */
+	abstract function group_import_group_member($group_id, $member_id, $role);
+    
+	/**
+	 * 导入群成员(批量导入)
+	 * @param string $group_id 要操作的群组id
+     * @param string $member_list 要导入的用户id集合，构造示例:
+     *   
+     *   $member_list = array();
+     *   $member_elem = array(
+     *      "Member_Account" => $member_id,
+     *      "Role" => $role
+     *   );   
+     *   array_push($member_list, $member_elem);
+     *
+	 * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+	 */
+	abstract function group_import_group_member2($group_id, $member_list);
+    
+	/**
+	 * 导入一条群文本消息
+	 * @param string $group_id 要操作的群组id
+     * @param string $from_account 该消息发送者
+     * @param int $text 文本消息内容
+	 * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+	 */
+    abstract function group_import_group_msg($group_id, $from_account, $text);
+    
+	/**
+	 * 导入群消息(高级接口, 一次最多导入20条)
+	 * @param string $group_id 要操作的群组id
+     * @param string $msg_list 消息集合, 构造方式如下：
+     *
+     *   //构造MsgBody
+     *   $msg_content = array(
+     *       "Text" => $text
+     *   );
+     *   $msg_body_elem = array(
+     *       "MsgType" => "TIMTextElem",
+     *       "MsgContent" => $msg_content,
+     *   );
+     *   $msg_body_list = array();
+     *   array_push($msg_body_list, $msg_body_elem);
+     *   //构造MsgList的一个元素
+     *   $msg_list_elem = array(
+     *       "From_Account" => $from_account,
+     *       "SendTime" => time(),
+     *       "Random" => rand(1, 65535),
+     *       "MsgBody" => $msg_body_list
+     *   );
+     *   //构造MsgList
+     *   $msg_list = array();
+     *   array_push($msg_list, $msg_list_elem);
+     *
+     * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+     */
+    abstract function group_import_group_msg2($group_id, $msg_list);
+    
+    /**
+	 * 设置群组成员未读计数
+	 * @param string $group_id 要操作的群组id
+     * @param string $member_account 要操作的群成员
+     * @param int $unread_msg_num 该成员的未读计数
+	 * @return array 通过解析REST接口json返回包得到的关联数组，包含成功与否、错误提示等字段
+	 */
+	abstract function group_set_unread_msg_num($group_id, $member_account, $unread_msg_num);
 
-	################################ 通用接口 ###################################
+
+    ################################ 通用接口 ###################################
 	/** 
 	 * 直接访问RestApi
 	 * 建议仅在没有合适接口时才考虑使用

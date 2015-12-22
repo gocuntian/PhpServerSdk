@@ -32,7 +32,8 @@
 		printf("  php TimRestApiGear.php sns friend_get_all (account_id)\n   获取用户所有好友\n");
 		printf("  php TimRestApiGear.php sns friend_get_list (account_id) (frd_id)\n   获取用户指定好友\n\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_appid_group_list\n   获取APP中所有群组信息(默认获取50个)\n");
-		printf("  php TimRestApiGear.php group_open_http_svc create_group (group_type) (group_name) (owner_id)\n   创建群组(max_member_num默认为500，");
+		printf("  php TimRestApiGear.php group_open_http_svc create_group (group_type) (group_name) (owner_id)\n   创建群组(max_member_num默认为500)\n");
+        printf("  php TimRestApiGear.php group_open_http_svc change_group_owner (group_id) (new_owner)\n   转让群组\n");
         printf("Public类型群组验证方式默认为需要验证，Private类型默认为禁止申请，ChatRoom类型默认为自由加入)\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_group_info (group_id)\n   获取指定群组信息\n");
 		printf("  php TimRestApiGear.php group_open_http_svc get_group_member_info (group_id) (limit) (offset)\n   获取群组成员信息\n");
@@ -46,7 +47,10 @@
 		printf("  php TimRestApiGear.php group_open_http_svc forbid_send_msg (group_id) (member_id) (second)\n   在群组中禁言用户\n");
 		printf("  php TimRestApiGear.php group_open_http_svc send_group_msg (account_id) (group_id) (text_content)\n   群组中发送普通消息\n");
 		printf("  php TimRestApiGear.php group_open_http_svc send_group_msg_pic (account_id) (group_id) (pic_path)\n   群组中发送图片(图片不超过5M)\n");
-		printf("  php TimRestApiGear.php group_open_http_svc send_group_system_notification (group_id) (text_content) (receive_id)\n   群组中发送系统消息\n");
+        printf("  php TimRestApiGear.php group_open_http_svc send_group_system_notification (group_id) (text_content) (receive_id)\n   群组中发送系统消息\n");
+        printf("  php TimRestApiGear.php group_open_http_svc import_group_member (group_id) (member_id) (role)\n   导入群组成员(Role不填为Member,唯一可填值为Admin)\n");
+        printf("  php TimRestApiGear.php group_open_http_svc import_group_msg (group_id) (from_account) (text)\n   导入群消息\n");
+        printf("  php TimRestApiGear.php group_open_http_svc set_unread_msg_num (group_id) (member_account) (unread_msg_num)\n   设置成员未读计数\n");
 		return;
 	}
 	list($server_name, $command) = array($argv[1], $argv[2]);
@@ -140,7 +144,10 @@
 			"group_open_http_svc.forbid_send_msg" => 'forbid_send_msg',
 			"group_open_http_svc.send_group_msg" => 'send_group_msg',
 			"group_open_http_svc.send_group_msg_pic" => 'send_group_msg_pic',
-			"group_open_http_svc.send_group_system_notification" => 'send_group_system_notification'
+			"group_open_http_svc.send_group_system_notification" => 'send_group_system_notification',
+            "group_open_http_svc.import_group_member" => 'import_group_member',
+            "group_open_http_svc.import_group_msg" => 'import_group_msg',
+            "group_open_http_svc.set_unread_msg_num" => 'set_unread_msg_num'
 			);
 
 	#分发命令
@@ -406,6 +413,21 @@
 		return $ret;
 	}
 
+    /** 
+     * 转让群
+     **/
+    function change_group_owner($api, $data_list)
+    {   
+
+        if($GLOBALS['argc'] < 5){ 
+            printf("group_open_http_svc.create_group 至少需要2个参数: 群id，新群主id\n");
+            return "Fail: not enough paragram for group_open_http_svc.change_group_owner?";
+        }   
+        list($group_type, $group_name, $owner_id) = $data_list;
+        $ret = $api->group_change_group_owner($group_type, $group_name, $owner_id);
+        return $ret;
+    }   
+
 	/**
 	 * 获取群组详细信息
 	 **/
@@ -610,6 +632,59 @@
 		//默认为空，发送全员
 		$ret = $api->group_send_group_system_notification($group_id, $text_content, $receiver_id);
 		return $ret;
-	}
+    }
 
+	/**
+	 * 导入群成员
+	 **/
+	function import_group_member($api, $data_list)
+	{
+
+		if($GLOBALS['argc'] < 5){
+			printf("group_open_http_svc.send_group_system_notification 需要至少两个参数: 群组id, 成员id\n");
+			return "Fail: not enough paragram for group_open_http_svc.import_group_member";
+        }
+        if($GLOBALS['argc'] == 5)
+        {
+		    list($group_id, $member_id) = $data_list;
+        }else
+        {
+            list($group_id, $member_id, $role) = $data_list;
+        }
+        $role = null;
+        $ret = $api->group_import_group_member($group_id, $member_id, $role);
+		return $ret;
+    }
+
+	/**
+	 * 导入群消息
+	 **/
+	function import_group_msg($api, $data_list)
+	{
+
+		if($GLOBALS['argc'] < 6){
+			printf("group_open_http_svc.send_group_system_notification 需要至少两个参数: 群组id, 消息发送者, 文本内容\n");
+			return "Fail: not enough paragram for group_open_http_svc.import_group_msg";
+		}
+		list($group_id, $from_account, $text) = $data_list;
+        
+        $ret = $api->group_import_group_msg($group_id, $from_account, $text);
+		return $ret;
+    }
+    
+    /**
+	 * 导入群消息
+	 **/
+	function set_unread_msg_num($api, $data_list)
+	{
+
+		if($GLOBALS['argc'] < 6){
+			printf("group_open_http_svc.send_group_system_notification 需要至少两个参数: 群组id, 成员id, 群内身份\n");
+			return "Fail: not enough paragram for group_open_http_svc.set_unread_msg_num";
+		}
+		list($group_id, $member_account, $unread_msg_num) = $data_list;
+		//默认为空，发送全员
+		$ret = $api->group_set_unread_msg_num($group_id, $member_account, $unread_msg_num);
+        return $ret;
+    }
 ?>
